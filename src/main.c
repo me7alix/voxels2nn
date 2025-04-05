@@ -10,7 +10,7 @@
 #define CUBE_SIZE 20
 #include "./parsers/vox_parser.c"
 
-#define VISUALIZATION_WHILE_LEARNING 1
+#define VISUALIZATION_WHILE_LEARNING 0
 const float learning_rate = 0.0005;
 const int epochs = 3000;
 
@@ -117,7 +117,8 @@ int main(void) {
   float c_x = 0.0, c_y = 0.0;
 
   while (!WindowShouldClose()) {
-    learning_iteration(nn, g, learning_rate, input, output, torus, apple);
+    if (VISUALIZATION_WHILE_LEARNING)
+      learning_iteration(nn, g, learning_rate, input, output, torus, apple);
 
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       slider = fmin(fmax(GetMouseX() / (float)screenWidth, 0.0), 1.0);
