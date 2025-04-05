@@ -1,7 +1,6 @@
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
-#include <raymath.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,17 +10,52 @@
 #define CUBE_SIZE 20
 #include "./parsers/vox_parser.c"
 
+#define VISUALIZATION_WHILE_LEARNING 1
+const float learning_rate = 0.0005;
+const int epochs = 3000;
+
+const float t = 0.05;
+void draw_voxel(Vector3 pos, int i, int j, int k) {
+  Vector3 lpos = Vector3Add((Vector3){j, k, i}, pos);
+  DrawCubeV(lpos, (Vector3){1, 1, 1}, WHITE);
+  DrawCubeWiresV((Vector3){lpos.x + t / 2.0, lpos.y + t / 2.0, lpos.z + t / 2.0},
+                (Vector3){1 + t, 1 + t, 1 + t}, WHITE);
+}
+
 void draw_voxels(Voxel *model, Vector3 pos) {
-  const float t = 0.05;
   for (size_t i = 0; i < CUBE_SIZE; i++) {
     for (size_t j = 0; j < CUBE_SIZE; j++) {
       for (size_t k = 0; k < CUBE_SIZE; k++) {
         if (model[index3D(j, i, k)].colorIndex != -1) {
-          Vector3 lpos = Vector3Add((Vector3){j, k, i}, pos);
-          DrawCubeV(lpos, (Vector3){1, 1, 1}, BLACK);
-          DrawCubeWiresV((Vector3){lpos.x + t / 2.0, lpos.y + t / 2.0, lpos.z + t / 2.0},
-                         (Vector3){1 + t, 1 + t, 1 + t}, WHITE);
+          draw_voxel(pos, i, j, k);
         }
+      }
+    }
+  }
+}
+
+void learning_iteration(NN nn, NN g, float learning_rate, Mat input, Mat output,
+                        Voxel *torus, Voxel *apple) {
+  for (size_t i = 0; i < CUBE_SIZE; i++) {
+    for (size_t j = 0; j < CUBE_SIZE; j++) {
+      for (size_t k = 0; k < CUBE_SIZE; k++) {
+        MAT_AT(input, 0, 0) = i / (CUBE_SIZE - 1.0);
+        MAT_AT(input, 0, 1) = j / (CUBE_SIZE - 1.0);
+        MAT_AT(input, 0, 2) = k / (CUBE_SIZE - 1.0);
+        MAT_AT(input, 0, 3) = 0;
+        MAT_AT(output, 0, 0) =
+            (float)(torus[index3D(j, i, k)].colorIndex != -1);
+        nn_backprop(nn, g, input, output);
+        nn_learn(nn, g, learning_rate);
+
+        MAT_AT(input, 0, 0) = i / (CUBE_SIZE - 1.0);
+        MAT_AT(input, 0, 1) = j / (CUBE_SIZE - 1.0);
+        MAT_AT(input, 0, 2) = k / (CUBE_SIZE - 1.0);
+        MAT_AT(input, 0, 3) = 1;
+        MAT_AT(output, 0, 0) =
+            (float)(apple[index3D(j, i, k)].colorIndex != -1);
+        nn_backprop(nn, g, input, output);
+        nn_learn(nn, g, learning_rate);
       }
     }
   }
@@ -36,8 +70,7 @@ int main(void) {
       (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
       (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
       (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
-      (Layer){.size = 1, .actf = ACT_SIGM, .randf = glorot_randf}
-  };
+      (Layer){.size = 1, .actf = ACT_RELU, .randf = glorot_randf}};
 
   NN nn = nn_alloc(layers, ARR_LEN(layers));
   NN g = nn_alloc(layers, ARR_LEN(layers));
@@ -53,47 +86,26 @@ int main(void) {
   printf("Learning process started\n");
 
   // learning process
-  const float learning_rate = 0.004;
-  const int epochs = 3000;
-  
-  for (int epoch = 0; epoch < epochs; epoch++) {
-    for (size_t i = 0; i < CUBE_SIZE; i++) {
-      for (size_t j = 0; j < CUBE_SIZE; j++) {
-        for (size_t k = 0; k < CUBE_SIZE; k++) {
-          MAT_AT(input, 0, 0) = i / (CUBE_SIZE - 1.0);
-          MAT_AT(input, 0, 1) = j / (CUBE_SIZE - 1.0);
-          MAT_AT(input, 0, 2) = k / (CUBE_SIZE - 1.0);
-          MAT_AT(input, 0, 3) = 0;
-          MAT_AT(output, 0, 0) =
-              (float)(torus[index3D(j, i, k)].colorIndex != -1);
-          nn_backprop(nn, g, input, output);
-          nn_learn(nn, g, learning_rate);
+  if (!VISUALIZATION_WHILE_LEARNING) {
+    for (int epoch = 0; epoch < epochs; epoch++) {
+      learning_iteration(nn, g, learning_rate, input, output, torus, apple);
 
-          MAT_AT(input, 0, 0) = i / (CUBE_SIZE - 1.0);
-          MAT_AT(input, 0, 1) = j / (CUBE_SIZE - 1.0);
-          MAT_AT(input, 0, 2) = k / (CUBE_SIZE - 1.0);
-          MAT_AT(input, 0, 3) = 1;
-          MAT_AT(output, 0, 0) =
-              (float)(apple[index3D(j, i, k)].colorIndex != -1);
-          nn_backprop(nn, g, input, output);
-          nn_learn(nn, g, learning_rate);
-        }
-      }
+      if (epoch % 100 == 0)
+        printf("epoch - %d\n", epoch);
     }
 
-    if (epoch % 100 == 0)
-      printf("epoch - %d\n", epoch);
+    printf(
+        "Learning ended. Use WASD to rotate the camera. Press ENTER to start "
+        "visualization...");
+    getchar();
   }
-
-  printf("Learning ended. Use WASD to rotate the camera. Press ENTER to start visualization...");
-  getchar(); 
 
   const int screenWidth = 800;
   const int screenHeight = 600;
   InitWindow(screenWidth, screenHeight, "Interp 3D");
 
   const float cameraDistance = 25;
-  Vector3 target = {CUBE_SIZE/2.0, CUBE_SIZE/2.0, CUBE_SIZE/2.0};
+  Vector3 target = {CUBE_SIZE / 2.0, CUBE_SIZE / 2.0, CUBE_SIZE / 2.0};
 
   Camera camera = {0};
   camera.target = target;
@@ -105,20 +117,23 @@ int main(void) {
   float c_x = 0.0, c_y = 0.0;
 
   while (!WindowShouldClose()) {
+    learning_iteration(nn, g, learning_rate, input, output, torus, apple);
+
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       slider = fmin(fmax(GetMouseX() / (float)screenWidth, 0.0), 1.0);
     }
 
-    if (IsKeyDown(KEY_A)) c_x += GetFrameTime() * 2;
-    if (IsKeyDown(KEY_D)) c_x -= GetFrameTime() * 2;
-    if (IsKeyDown(KEY_W)) c_y += GetFrameTime() * 2;
-    if (IsKeyDown(KEY_S)) c_y -= GetFrameTime() * 2;
-  
-    camera.position = (Vector3){
-      cameraDistance * cos(c_x),
-      c_y * cameraDistance,
-      cameraDistance * sin(c_x)
-    };
+    if (IsKeyDown(KEY_A))
+      c_x += GetFrameTime() * 2;
+    if (IsKeyDown(KEY_D))
+      c_x -= GetFrameTime() * 2;
+    if (IsKeyDown(KEY_W))
+      c_y += GetFrameTime() * 2;
+    if (IsKeyDown(KEY_S))
+      c_y -= GetFrameTime() * 2;
+
+    camera.position = (Vector3){cameraDistance * cos(c_x), c_y * cameraDistance,
+                                cameraDistance * sin(c_x)};
     camera.position = Vector3Add(camera.position, target);
 
     BeginDrawing();
@@ -126,22 +141,19 @@ int main(void) {
 
     UpdateCamera(&camera, CAMERA_PERSPECTIVE);
     BeginMode3D(camera);
-    
+
     const float scale = 1.5;
-    for (size_t i = 0; i < CUBE_SIZE*scale; i++) {
-      for (size_t j = 0; j < CUBE_SIZE*scale; j++) {
-        for (size_t k = 0; k < CUBE_SIZE*scale; k++) {
-          MAT_AT(NN_INPUT(nn), 0, 0) = i / (CUBE_SIZE*scale - 1.0);
-          MAT_AT(NN_INPUT(nn), 0, 1) = j / (CUBE_SIZE*scale - 1.0);
-          MAT_AT(NN_INPUT(nn), 0, 2) = k / (CUBE_SIZE*scale - 1.0);
+    for (size_t i = 0; i < CUBE_SIZE * scale; i++) {
+      for (size_t j = 0; j < CUBE_SIZE * scale; j++) {
+        for (size_t k = 0; k < CUBE_SIZE * scale; k++) {
+          MAT_AT(NN_INPUT(nn), 0, 0) = i / (CUBE_SIZE * scale - 1.0);
+          MAT_AT(NN_INPUT(nn), 0, 1) = j / (CUBE_SIZE * scale - 1.0);
+          MAT_AT(NN_INPUT(nn), 0, 2) = k / (CUBE_SIZE * scale - 1.0);
           MAT_AT(NN_INPUT(nn), 0, 3) = slider;
           nn_forward(nn);
 
           if (MAT_AT(NN_OUTPUT(nn), 0, 0) > 0.5) {
-            DrawCubeV((Vector3){j/scale, k/scale, i/scale}, (Vector3){1/scale, 1/scale, 1/scale}, BLACK);
-            float t = 0.05/scale;
-            DrawCubeWiresV((Vector3){j/scale + t / 2.0, k/scale + t / 2.0, i/scale + t / 2.0},
-                           (Vector3){1/scale + t, 1/scale + t, 1/scale + t}, WHITE);
+            draw_voxel((Vector3){0}, i, j, k);
           }
         }
       }
@@ -152,7 +164,7 @@ int main(void) {
 
     EndMode3D();
 
-    DrawRectangle(slider*screenWidth-15, screenHeight-30, 30, 30, RED);
+    DrawRectangle(slider * screenWidth - 15, screenHeight - 30, 30, 30, RED);
 
     EndDrawing();
   }
