@@ -45,6 +45,7 @@ typedef enum {
   ACT_RELU,
   ACT_TANH,
   ACT_SOFTMAX,
+  ACT_BINSTEP,
 } Act;
 
 typedef struct {
@@ -351,6 +352,8 @@ float actf(float x, Act actf) {
   case ACT_TANH:
     float ex = expf(x);
     return (ex - 1.0 / ex) / (ex + 1.0 / ex);
+  case ACT_BINSTEP:
+    return x >= 0 ? 1 : 0; 
   }
 }
 
@@ -364,6 +367,8 @@ float dactf(float y, Act actf) {
     return 1.0 - (y * y);
   case ACT_SOFTMAX:
     return 1.0;
+  case ACT_BINSTEP:
+    return 0.0;
   }
 }
 

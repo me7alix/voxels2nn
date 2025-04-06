@@ -10,14 +10,14 @@
 #define CUBE_SIZE 20
 #include "./parsers/vox_parser.c"
 
-#define VISUALIZATION_WHILE_LEARNING 0
-const float learning_rate = 0.0005;
+#define VISUALIZATION_WHILE_LEARNING true
+const float learning_rate = 0.004;
 const int epochs = 3000;
 
-const float t = 0.05;
+const float t = 0.002;
 void draw_voxel(Vector3 pos, int i, int j, int k) {
   Vector3 lpos = Vector3Add((Vector3){j, k, i}, pos);
-  DrawCubeV(lpos, (Vector3){1, 1, 1}, WHITE);
+  DrawCubeV(lpos, (Vector3){1, 1, 1}, BLACK);
   DrawCubeWiresV((Vector3){lpos.x + t / 2.0, lpos.y + t / 2.0, lpos.z + t / 2.0},
                 (Vector3){1 + t, 1 + t, 1 + t}, WHITE);
 }
@@ -67,10 +67,10 @@ int main(void) {
   Layer layers[] = {
       (Layer){.size = 4},
       (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
-      (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
-      (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
-      (Layer){.size = 7, .actf = ACT_RELU, .randf = glorot_randf},
-      (Layer){.size = 1, .actf = ACT_RELU, .randf = glorot_randf}};
+      (Layer){.size = 7, .actf = ACT_TANH, .randf = glorot_randf},
+      (Layer){.size = 7, .actf = ACT_TANH, .randf = glorot_randf},
+      (Layer){.size = 7, .actf = ACT_TANH, .randf = glorot_randf},
+      (Layer){.size = 1, .actf = ACT_SIGM, .randf = glorot_randf}};
 
   NN nn = nn_alloc(layers, ARR_LEN(layers));
   NN g = nn_alloc(layers, ARR_LEN(layers));
@@ -143,7 +143,7 @@ int main(void) {
     UpdateCamera(&camera, CAMERA_PERSPECTIVE);
     BeginMode3D(camera);
 
-    const float scale = 1.5;
+    const float scale = 1;
     for (size_t i = 0; i < CUBE_SIZE * scale; i++) {
       for (size_t j = 0; j < CUBE_SIZE * scale; j++) {
         for (size_t k = 0; k < CUBE_SIZE * scale; k++) {
@@ -160,8 +160,8 @@ int main(void) {
       }
     }
 
-    draw_voxels(torus, (Vector3){CUBE_SIZE + 5.0, 0, 0});
-    draw_voxels(apple, (Vector3){-(CUBE_SIZE + 5.0), 0, 0});
+    //draw_voxels(torus, (Vector3){CUBE_SIZE + 5.0, 0, 0});
+    //draw_voxels(apple, (Vector3){-(CUBE_SIZE + 5.0), 0, 0});
 
     EndMode3D();
 
